@@ -2042,7 +2042,9 @@ bool BlackFlowSession::apply_encounter_selection(
         return false;
     }
     if (context.rule.has_value() &&
-        std::ranges::find(context.rule->option_text, selection.option_text) != context.rule->option_text.end()) {
+        std::ranges::any_of(context.rule->option_text, [&selection](const std::string& target) {
+            return !target.empty() && selection.option_text.find(target) != std::string::npos;
+        })) {
         for (const auto& [name, value] : context.rule->on_selected) {
             const auto definition = BlackFlowStrategy.get_fact_definition(name);
             if (!definition.has_value() || definition->get().scope != FactScope::Run ||

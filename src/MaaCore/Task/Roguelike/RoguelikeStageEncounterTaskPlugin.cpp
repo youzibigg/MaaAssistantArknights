@@ -521,7 +521,16 @@ std::optional<std::string> asst::RoguelikeStageEncounterTaskPlugin::select_black
     if (event.continue_single_option) {
         return continue_blackflow_event(event);
     }
-    if (const auto result_task = event.option_tasks.find(selected_text); result_task != event.option_tasks.end()) {
+    auto result_task = event.option_tasks.find(selected_text);
+    if (result_task == event.option_tasks.end()) {
+        for (auto it = event.option_tasks.begin(); it != event.option_tasks.end(); ++it) {
+            if (!it->first.empty() && selected_text.find(it->first) != std::string::npos &&
+                (result_task == event.option_tasks.end() || it->first.size() > result_task->first.size())) {
+                result_task = it;
+            }
+        }
+    }
+    if (result_task != event.option_tasks.end()) {
         // 经独立入口转发，保留目标任务的模板、回调名称和执行次数。
         if (!Task.lazy_parse(
                 json::object {
@@ -568,6 +577,25 @@ std::optional<asst::RoguelikeStageEncounterTaskPlugin::SelectedOption>
             if (option_it != m_option_list.end()) {
                 choice = std::distance(m_option_list.begin(), option_it) + 1;
                 break;
+            }
+        }
+        if (blackflow && choice == 0) {
+            for (const std::string& target : plan.option_text) {
+                if (target.empty()) {
+                    continue;
+                }
+                const auto matches = [&target](const OptionAnalyzer::Option& option) {
+                    return option.enabled && option.text.find(target) != std::string::npos;
+                };
+                const auto match_count = std::ranges::count_if(m_option_list, matches);
+                if (match_count > 1) {
+                    LogError << "RoguelikeEncounter | Ambiguous option text" << event_name << target << match_count;
+                    return std::nullopt;
+                }
+                if (match_count == 1) {
+                    choice = std::distance(m_option_list.begin(), std::ranges::find_if(m_option_list, matches)) + 1;
+                    break;
+                }
             }
         }
     }
