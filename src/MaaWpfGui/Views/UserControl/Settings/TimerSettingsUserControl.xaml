@@ -196,15 +196,21 @@
                 Grid.Column="2"
                 Grid.ColumnSpan="2"
                 Width="320"
-                MaxHeight="{c:Binding 'ActualHeight > 154 ? ActualHeight : 154',
-                                      ElementName=TimerOptionsPanel}"
+                Height="{Binding ActualHeight, ElementName=TimerOptionsPanel}"
+                MinHeight="154"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <Border Grid.Row="0" HorizontalAlignment="Center">
+                <Button
+                    Grid.Row="0"
+                    Margin="5,5,5,10"
+                    HorizontalAlignment="Center"
+                    Command="{s:Action AddTimer}"
+                    Content="{DynamicResource AddTimer}" />
+                <Border Grid.Row="1" HorizontalAlignment="Center">
                     <Border.Style>
                         <Style TargetType="{x:Type Border}">
                             <Setter Property="Width" Value="320" />
@@ -220,25 +226,12 @@
                         HorizontalScrollBarVisibility="Disabled"
                         IsInertiaEnabled="True"
                         VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <controls:TextBlock
-                                Margin="5,8"
-                                Text="{DynamicResource TimersEmpty}"
-                                TextWrapping="Wrap"
-                                Visibility="{c:Binding 'TimerList.Count == 0'}" />
-                            <ItemsControl
-                                x:Name="TimerItemsControl"
-                                ItemTemplate="{StaticResource TimerItemTemplate}"
-                                ItemsSource="{Binding TimerList}" />
-                        </StackPanel>
+                        <ItemsControl
+                            x:Name="TimerItemsControl"
+                            ItemTemplate="{StaticResource TimerItemTemplate}"
+                            ItemsSource="{Binding TimerList}" />
                     </hc:ScrollViewer>
                 </Border>
-                <Button
-                    Grid.Row="1"
-                    Margin="5,5,5,5"
-                    HorizontalAlignment="Center"
-                    Command="{s:Action AddTimer}"
-                    Content="{DynamicResource AddTimer}" />
             </Grid>
         </Grid>
     </Grid>
