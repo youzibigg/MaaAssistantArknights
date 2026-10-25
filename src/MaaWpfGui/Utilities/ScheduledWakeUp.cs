@@ -23,11 +23,11 @@ using MaaWpfGui.Configuration.Factory;
 using MaaWpfGui.Main;
 using MaaWpfGui.WineCompat;
 using Serilog;
+using Stylet;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.System.Com;
 using Windows.Win32.System.TaskScheduler;
-using Timer = MaaWpfGui.Configuration.Global.Timer;
 
 namespace MaaWpfGui.Utilities;
 
@@ -63,6 +63,7 @@ public static class ScheduledWakeUp
     private static readonly Guid ClsidTaskScheduler = new("0F87369F-A4E5-4CFC-BD3E-73E6154572DD");
 
     private static CancellationTokenSource? _debounceCts;
+    private static long _snapshotVersion;
 
     // 删任务与注册的序列不可交错，否则并发的 SyncAll 可能留下与开关终态相反的任务
     private static readonly Lock _syncLock = new();
@@ -86,18 +87,35 @@ public static class ScheduledWakeUp
 
         try
         {
+            bool scheduledWakeUp = false;
+            (int Id, int Hour, int Minute)[] enabledTimers = [];
+            long snapshotVersion = 0;
+
+            // 在获取同步锁前等待 UI 线程，复制数值，避免后台读取仍可修改的配置对象。
+            Execute.OnUIThreadSync(() => {
+                var timers = ConfigFactory.Root.Timers;
+                scheduledWakeUp = timers.ScheduledWakeUp;
+                enabledTimers = timers.List
+                    .Where(timer => timer.IsEnabled != false)
+                    .Select(timer => (timer.Id, timer.Hour, timer.Minute))
+                    .DistinctBy(timer => (timer.Hour, timer.Minute))
+                    .ToArray();
+                snapshotVersion = Interlocked.Increment(ref _snapshotVersion);
+            });
+
             lock (_syncLock)
             {
+                // 较早的快照若晚于新快照取得锁，不应覆盖较新的设置。
+                if (snapshotVersion != Volatile.Read(ref _snapshotVersion))
+                {
+                    return true;
+                }
+
                 PInvoke.CoCreateInstance(ClsidTaskScheduler, null, CLSCTX.CLSCTX_ALL, out ITaskService taskService).ThrowOnFailure();
                 taskService.Connect(null, null, null, null);
                 ITaskFolder rootFolder = GetRootFolder(taskService);
-                var timers = ConfigFactory.Root.Timers;
-                var enabledTimers = timers.List
-                    .Where(timer => timer.IsEnabled != false)
-                    .DistinctBy(timer => (timer.Hour, timer.Minute))
-                    .ToArray();
 
-                if (timers.ScheduledWakeUp && enabledTimers.Length > MaxWakeUpTriggers)
+                if (scheduledWakeUp && enabledTimers.Length > MaxWakeUpTriggers)
                 {
                     error = $"Windows Task Scheduler supports at most {MaxWakeUpTriggers} distinct wake-up times per task.";
                     _logger.Error("{ErrorMessage} Requested wake-up times: {TriggerCount}", error, enabledTimers.Length);
@@ -107,7 +125,7 @@ public static class ScheduledWakeUp
                 // 一律覆盖式重建：先删本实例任务，再按当前状态决定是否注册
                 DeleteTask(rootFolder);
 
-                if (!timers.ScheduledWakeUp || enabledTimers.Length == 0)
+                if (!scheduledWakeUp || enabledTimers.Length == 0)
                 {
                     _logger.Information("Scheduled wake-up is off or has no enabled timers, task removed");
                     return true;
@@ -182,7 +200,7 @@ public static class ScheduledWakeUp
         }
     }
 
-    private static void RegisterTask(ITaskService taskService, ITaskFolder rootFolder, IReadOnlyList<Timer> timers)
+    private static void RegisterTask(ITaskService taskService, ITaskFolder rootFolder, IReadOnlyList<(int Id, int Hour, int Minute)> timers)
     {
         taskService.NewTask(0, out ITaskDefinition definition);
         WithBStr("Wakes up the computer and launches MAA before each enabled scheduled timer", description => definition.RegistrationInfo.Description = description);
