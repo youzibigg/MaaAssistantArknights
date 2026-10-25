@@ -1190,7 +1190,7 @@ public class TaskQueueViewModel : Screen
     private static bool IsTimerEnabled(ScheduledTimer timer)
     {
         bool enabled = false;
-        Execute.OnUIThread(() => enabled = SettingsViewModel.TimerSettings.TimerList.Contains(timer) && timer.IsEnabled != false);
+        Execute.OnUIThreadSync(() => enabled = SettingsViewModel.TimerSettings.TimerList.Contains(timer) && timer.IsEnabled != false);
         return enabled;
     }
 
