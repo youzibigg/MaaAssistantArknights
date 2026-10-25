@@ -5,7 +5,6 @@
     xmlns:c="clr-namespace:CalcBinding;assembly=CalcBinding"
     xmlns:controls="clr-namespace:MaaWpfGui.Styles.Controls"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-    xmlns:dd="urn:gong-wpf-dragdrop"
     xmlns:hc="https://handyorg.github.io/handycontrol"
     xmlns:helper="clr-namespace:MaaWpfGui.Helper"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -17,102 +16,91 @@
     s:View.ActionTarget="{Binding}"
     mc:Ignorable="d">
     <UserControl.Resources>
+        <Style x:Key="TimerOptionRowStyle" TargetType="{x:Type StackPanel}">
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Margin" Value="10,4" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="Orientation" Value="Horizontal" />
+        </Style>
         <DataTemplate x:Key="TimerItemTemplate">
-            <StackPanel Margin="5,4">
-                <Grid>
-                    <Grid.Style>
-                        <Style TargetType="{x:Type Grid}">
-                            <Setter Property="HorizontalAlignment" Value="Stretch" />
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding CustomConfig, Source={x:Static settings_vms:TimerSettingsUserControlModel.Instance}}" Value="False">
-                                    <Setter Property="HorizontalAlignment" Value="Center" />
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Grid.Style>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition>
-                            <ColumnDefinition.Style>
-                                <Style TargetType="{x:Type ColumnDefinition}">
-                                    <Setter Property="Width" Value="*" />
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding CustomConfig, Source={x:Static settings_vms:TimerSettingsUserControlModel.Instance}}" Value="False">
-                                            <Setter Property="Width" Value="0" />
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ColumnDefinition.Style>
-                        </ColumnDefinition>
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <CheckBox
-                        Grid.Column="0"
-                        Margin="0,5,5,5"
-                        VerticalAlignment="Center"
-                        IsChecked="{Binding IsEnabled}"
-                        MouseRightButtonUp="{s:Action ToggleCheckBoxNullOnRightClick,
-                                                      Target={x:Type helper:CheckBoxHelper}}"
-                        ToolTip="{DynamicResource CheckBoxesNotSavedAsNull}">
-                        <TextBlock><Run Text="{DynamicResource Timer}" /><Run xml:space="preserve" Text=" " /><Run Text="{c:Binding 'Id + 1'}" /></TextBlock>
-                    </CheckBox>
-                    <hc:NumericUpDown
-                        Grid.Column="1"
-                        Width="55"
-                        Height="30"
-                        Margin="3,0"
-                        InputMethod.IsInputMethodEnabled="False"
-                        IsEnabled="{c:Binding 'IsEnabled ?? &quot;True&quot;'}"
-                        Maximum="23"
-                        Minimum="0"
-                        ValueFormat="00"
-                        Value="{Binding Hour}" />
-                    <controls:TextBlock
-                        Grid.Column="2"
-                        Margin="2,0"
-                        VerticalAlignment="Center"
-                        Text=":" />
-                    <hc:NumericUpDown
-                        Grid.Column="3"
-                        Width="55"
-                        Height="30"
-                        Margin="3,0"
-                        InputMethod.IsInputMethodEnabled="False"
-                        IsEnabled="{c:Binding 'IsEnabled ?? &quot;True&quot;'}"
-                        Maximum="59"
-                        Minimum="0"
-                        ValueFormat="00"
-                        Value="{Binding Minute}" />
-                    <ComboBox
-                        Grid.Column="4"
-                        Height="30"
-                        Margin="5,0,0,0"
-                        Focusable="False"
-                        IsEnabled="{Binding Run.Idle, Source={x:Static helper:Instances.SettingsViewModel}}"
-                        ItemsSource="{Binding ConfigurationList, Source={x:Static helper:Instances.SettingsViewModel}}"
-                        SelectedValue="{Binding Config}"
-                        SelectedValuePath="Value"
-                        ToolTip="{Binding Config}"
-                        Visibility="{c:Binding CustomConfig,
-                                               Source={x:Static settings_vms:TimerSettingsUserControlModel.Instance}}" />
-                    <Button
-                        Grid.Column="5"
-                        Width="25"
-                        Height="25"
-                        Margin="5,0,0,0"
-                        Padding="0"
-                        hc:IconElement.Geometry="{StaticResource DeleteTaskGeometry}"
-                        hc:IconElement.Height="15"
-                        hc:IconElement.Width="15"
-                        Command="{s:Action RemoveTimer,
-                                           Target={x:Static settings_vms:TimerSettingsUserControlModel.Instance}}"
-                        CommandParameter="{Binding}"
-                        ToolTip="{DynamicResource Delete}" />
-                </Grid>
-            </StackPanel>
+            <Grid x:Name="TimerRow" Margin="5,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition x:Name="ConfigColumn" Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <CheckBox
+                    Grid.Column="0"
+                    Margin="0,5,5,5"
+                    VerticalAlignment="Center"
+                    IsChecked="{Binding IsEnabled}"
+                    MouseRightButtonUp="{s:Action ToggleCheckBoxNullOnRightClick,
+                                                  Target={x:Type helper:CheckBoxHelper}}"
+                    ToolTip="{DynamicResource CheckBoxesNotSavedAsNull}">
+                    <TextBlock><Run Text="{DynamicResource Timer}" /><Run xml:space="preserve" Text=" " /><Run Text="{c:Binding 'Id + 1'}" /></TextBlock>
+                </CheckBox>
+                <hc:NumericUpDown
+                    Grid.Column="1"
+                    Width="55"
+                    Height="30"
+                    Margin="3,0"
+                    InputMethod.IsInputMethodEnabled="False"
+                    IsEnabled="{c:Binding 'IsEnabled ?? &quot;True&quot;'}"
+                    Maximum="23"
+                    Minimum="0"
+                    ValueFormat="00"
+                    Value="{Binding Hour}" />
+                <controls:TextBlock
+                    Grid.Column="2"
+                    Margin="2,0"
+                    VerticalAlignment="Center"
+                    Text=":" />
+                <hc:NumericUpDown
+                    Grid.Column="3"
+                    Width="55"
+                    Height="30"
+                    Margin="3,0"
+                    InputMethod.IsInputMethodEnabled="False"
+                    IsEnabled="{c:Binding 'IsEnabled ?? &quot;True&quot;'}"
+                    Maximum="59"
+                    Minimum="0"
+                    ValueFormat="00"
+                    Value="{Binding Minute}" />
+                <ComboBox
+                    x:Name="ConfigSelector"
+                    Grid.Column="4"
+                    Height="30"
+                    Margin="5,0,0,0"
+                    Focusable="False"
+                    IsEnabled="{Binding Run.Idle, Source={x:Static helper:Instances.SettingsViewModel}}"
+                    ItemsSource="{Binding ConfigurationList, Source={x:Static helper:Instances.SettingsViewModel}}"
+                    SelectedValue="{Binding Config}"
+                    SelectedValuePath="Value"
+                    ToolTip="{Binding Config}" />
+                <Button
+                    Grid.Column="5"
+                    Width="25"
+                    Height="25"
+                    Margin="5,0,0,0"
+                    Padding="0"
+                    hc:IconElement.Geometry="{StaticResource DeleteTaskGeometry}"
+                    hc:IconElement.Height="15"
+                    hc:IconElement.Width="15"
+                    Command="{s:Action RemoveTimer,
+                                       Target={x:Static settings_vms:TimerSettingsUserControlModel.Instance}}"
+                    CommandParameter="{Binding}"
+                    ToolTip="{DynamicResource Delete}" />
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding CustomConfig, Source={x:Static settings_vms:TimerSettingsUserControlModel.Instance}}" Value="False">
+                    <Setter TargetName="ConfigSelector" Property="Visibility" Value="Collapsed" />
+                    <Setter TargetName="ConfigColumn" Property="Width" Value="0" />
+                    <Setter TargetName="TimerRow" Property="HorizontalAlignment" Value="Center" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
         </DataTemplate>
     </UserControl.Resources>
     <Grid>
@@ -121,28 +109,25 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
         <controls:GlobalConfigTip Grid.Row="0" />
+        <!--  两侧区域共享中间的布局列，保留既有中心位置，并给每个区域分配完整宽度。  -->
         <Grid
             Grid.Row="1"
-            Width="570"
             Margin="5"
             HorizontalAlignment="Center">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="250" />
-                <ColumnDefinition Width="320" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="210" />
+                <ColumnDefinition Width="40" />
+                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="20" />
             </Grid.ColumnDefinitions>
             <StackPanel
                 x:Name="TimerOptionsPanel"
-                Grid.Column="0"
+                Grid.Column="1"
+                Grid.ColumnSpan="2"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top">
-                <StackPanel.RenderTransform>
-                    <TranslateTransform X="20" />
-                </StackPanel.RenderTransform>
-                <StackPanel
-                    MinHeight="30"
-                    Margin="10,4"
-                    HorizontalAlignment="Left"
-                    Orientation="Horizontal">
+                <StackPanel Style="{StaticResource TimerOptionRowStyle}">
                     <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding ScheduledWakeUp}">
                         <TextBlock
                             MaxWidth="170"
@@ -152,11 +137,7 @@
                     <controls:TooltipBlock VerticalAlignment="Center" TooltipText="{DynamicResource ScheduledWakeUpTip}" />
                 </StackPanel>
                 <StackPanel HorizontalAlignment="Left">
-                    <StackPanel
-                        MinHeight="30"
-                        Margin="10,4"
-                        HorizontalAlignment="Left"
-                        Orientation="Horizontal">
+                    <StackPanel Style="{StaticResource TimerOptionRowStyle}">
                         <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding NotifyBeforeScheduledStart}">
                             <TextBlock
                                 MaxWidth="170"
@@ -178,11 +159,7 @@
                         Value="{Binding ScheduledStartNotificationMinutes}" />
                 </StackPanel>
                 <StackPanel HorizontalAlignment="Left">
-                    <StackPanel
-                        MinHeight="30"
-                        Margin="10,4"
-                        HorizontalAlignment="Left"
-                        Orientation="Horizontal">
+                    <StackPanel Style="{StaticResource TimerOptionRowStyle}">
                         <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding ForceScheduledStart}">
                             <TextBlock
                                 MaxWidth="170"
@@ -205,11 +182,7 @@
                         <controls:TooltipBlock VerticalAlignment="Center" TooltipText="{DynamicResource ShowWindowBeforeForceScheduledStartTip}" />
                     </StackPanel>
                 </StackPanel>
-                <StackPanel
-                    MinHeight="30"
-                    Margin="10,4"
-                    HorizontalAlignment="Left"
-                    Orientation="Horizontal">
+                <StackPanel Style="{StaticResource TimerOptionRowStyle}">
                     <CheckBox VerticalContentAlignment="Center" IsChecked="{Binding CustomConfig}">
                         <TextBlock
                             MaxWidth="170"
@@ -220,46 +193,46 @@
                 </StackPanel>
             </StackPanel>
             <Grid
-                Grid.Column="1"
+                Grid.Column="2"
+                Grid.ColumnSpan="2"
+                Width="320"
                 Height="{Binding ActualHeight, ElementName=TimerOptionsPanel}"
                 MinHeight="154"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top">
-                <Grid.Style>
-                    <Style TargetType="{x:Type Grid}">
-                        <Setter Property="Width" Value="320" />
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding CustomConfig, Source={x:Static settings_vms:TimerSettingsUserControlModel.Instance}}" Value="False">
-                                <Setter Property="Width" Value="250" />
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Grid.Style>
-                <Grid.RenderTransform>
-                    <TranslateTransform X="-20" />
-                </Grid.RenderTransform>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
-                <hc:ScrollViewer
-                    x:Name="TimerScrollViewer"
-                    Grid.Row="0"
-                    HorizontalScrollBarVisibility="Disabled"
-                    IsInertiaEnabled="True"
-                    VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                        <controls:TextBlock
-                            Margin="5,8"
-                            Text="{DynamicResource TimersEmpty}"
-                            TextWrapping="Wrap"
-                            Visibility="{c:Binding 'TimerList.Count == 0'}" />
-                        <ItemsControl
-                            x:Name="TimerItemsControl"
-                            ItemTemplate="{StaticResource TimerItemTemplate}"
-                            ItemsSource="{Binding TimerList}" />
-                    </StackPanel>
-                </hc:ScrollViewer>
+                <Border Grid.Row="0" HorizontalAlignment="Center">
+                    <Border.Style>
+                        <Style TargetType="{x:Type Border}">
+                            <Setter Property="Width" Value="320" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CustomConfig, Source={x:Static settings_vms:TimerSettingsUserControlModel.Instance}}" Value="False">
+                                    <Setter Property="Width" Value="250" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Border.Style>
+                    <hc:ScrollViewer
+                        x:Name="TimerScrollViewer"
+                        HorizontalScrollBarVisibility="Disabled"
+                        IsInertiaEnabled="True"
+                        VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <controls:TextBlock
+                                Margin="5,8"
+                                Text="{DynamicResource TimersEmpty}"
+                                TextWrapping="Wrap"
+                                Visibility="{c:Binding 'TimerList.Count == 0'}" />
+                            <ItemsControl
+                                x:Name="TimerItemsControl"
+                                ItemTemplate="{StaticResource TimerItemTemplate}"
+                                ItemsSource="{Binding TimerList}" />
+                        </StackPanel>
+                    </hc:ScrollViewer>
+                </Border>
                 <Button
                     Grid.Row="1"
                     Margin="5,10,5,5"
