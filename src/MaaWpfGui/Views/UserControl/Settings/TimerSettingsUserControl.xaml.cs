@@ -11,6 +11,9 @@
 // but WITHOUT ANY WARRANTY
 // </copyright>
 
+using System.Collections.Specialized;
+using System.Windows.Threading;
+
 namespace MaaWpfGui.Views.UserControl.Settings;
 
 /// <summary>
@@ -24,5 +27,14 @@ public partial class TimerSettingsUserControl : System.Windows.Controls.UserCont
     public TimerSettingsUserControl()
     {
         InitializeComponent();
+        ((INotifyCollectionChanged)TimerItemsControl.Items).CollectionChanged += TimerItems_CollectionChanged;
+    }
+
+    private void TimerItems_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.Action == NotifyCollectionChangedAction.Add)
+        {
+            Dispatcher.BeginInvoke(() => TimerScrollViewer.ScrollToEnd(), DispatcherPriority.Loaded);
+        }
     }
 }
