@@ -635,6 +635,7 @@ D:\
     <system:String x:Key="TimerCustomConfig">커스텀 구성 옵션</system:String>
     <system:String x:Key="AddTimer">예약 추가</system:String>
     <system:String x:Key="TimersEmpty">추가된 예약이 없습니다</system:String>
+    <system:String x:Key="TimerLimitReachedTip">음메, 더는 안 들어가요!</system:String>
     <system:String x:Key="TimerCustomConfigTip">예약 시작 2분 전에 MAA를 재실행하고 설정을 전환합니다</system:String>
     <system:String x:Key="NotifyBeforeScheduledStart">예약 실행 전 시스템 알림 전송</system:String>
     <system:String x:Key="NotifyBeforeScheduledStartTip" xml:space="preserve">설정된 사전 알림 시간에 시스템 알림을 보냅니다.&#10;외부 알림은 ｢{key=Settings} - {key=NotificationSettings} - {key=ExternalNotificationSettings}｣에서 별도로 활성화할 수 있으며 사전 알림 시간을 공유합니다.</system:String>

@@ -34,6 +34,8 @@ namespace MaaWpfGui.ViewModels.UserControl.Settings;
 /// </summary>
 public class TimerSettingsUserControlModel : PropertyChangedBase
 {
+    private const int MaxTimerCount = 48;
+
     private readonly HashSet<Timer> _subscribedTimers = [];
 
     static TimerSettingsUserControlModel()
@@ -93,6 +95,15 @@ public class TimerSettingsUserControlModel : PropertyChangedBase
 
     public void AddTimer()
     {
+        if (TimerList.Count >= MaxTimerCount)
+        {
+            MessageBoxHelper.Show(
+                LocalizationHelper.GetString("TimerLimitReachedTip"),
+                LocalizationHelper.GetString("Tip"),
+                icon: MessageBoxImage.Information);
+            return;
+        }
+
         int id = TimerList.Count == 0 ? 0 : TimerList.Max(timer => timer.Id) + 1;
         var startTime = DateTime.Now.AddHours(1);
         TimerList.Add(new Timer(id, Instances.SettingsViewModel.CurrentConfiguration ?? string.Empty) {

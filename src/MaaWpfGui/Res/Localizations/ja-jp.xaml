@@ -635,6 +635,7 @@ D:\
     <system:String x:Key="TimerCustomConfig">カスタム構成オプション</system:String>
     <system:String x:Key="AddTimer">タイマーを追加</system:String>
     <system:String x:Key="TimersEmpty">タイマーが追加されていません</system:String>
+    <system:String x:Key="TimerLimitReachedTip">モー、もう入らないよ！</system:String>
     <system:String x:Key="TimerCustomConfigTip">起動時刻の2分前にMAAを再起動して設定を切り替えます</system:String>
     <system:String x:Key="NotifyBeforeScheduledStart">定時実行前にシステム通知を送信</system:String>
     <system:String x:Key="NotifyBeforeScheduledStartTip" xml:space="preserve">設定したタイミングでシステム通知を送信します。&#10;外部通知は ｢{key=Settings} - {key=NotificationSettings} - {key=ExternalNotificationSettings}｣ で個別に有効にでき、通知するタイミングは共通です。</system:String>
