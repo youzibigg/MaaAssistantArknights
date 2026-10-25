@@ -13,8 +13,9 @@
 
 #nullable enable
 using System;
-using System.Collections.ObjectModel;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,14 +32,14 @@ using Timer = MaaWpfGui.Configuration.Global.Timer;
 namespace MaaWpfGui.Utilities;
 
 /// <summary>
-/// Registers a Windows scheduled task with one wake-enabled daily trigger per enabled in-app timer,
+/// Registers a Windows scheduled task with one wake-enabled daily trigger per distinct enabled timer time,
 /// which wakes the computer and launches MAA a few minutes before the timer so that the existing
 /// in-process timer logic can take over afterwards.
-/// 通过 Windows 任务计划程序注册单个计划任务，每个启用的定时项对应一个每日触发器，提前唤醒计算机并启动 MAA。
+/// 通过 Windows 任务计划程序注册单个计划任务，每个不同的启用时刻对应一个每日触发器，提前唤醒计算机并启动 MAA。
 /// </summary>
 public static class ScheduledWakeUp
 {
-    private const int TimerSlotCount = 8;
+    private const int MaxWakeUpTriggers = 48;
     private const int WakeUpLeadMinutes = 5;
 
     /// <summary>
@@ -67,10 +68,9 @@ public static class ScheduledWakeUp
     private static readonly Lock _syncLock = new();
 
     /// <summary>
-    /// Rebuilds all scheduled wake-up tasks of this instance to match the current settings:
-    /// removes every known slot task first, then registers one task per enabled timer when the
-    /// global switch is on, and removes all tasks when it is off. Existing tasks are always
-    /// overwritten, including ones manually disabled in Task Scheduler.
+    /// Rebuilds this instance's scheduled wake-up task to match the current settings.
+    /// Removes the task when disabled or no timers are enabled. Invalid trigger counts are
+    /// rejected before replacing the existing task, including one manually disabled in Task Scheduler.
     /// </summary>
     /// <param name="error">Outputs the error message in case of failure.</param>
     /// <returns>Whether the operation is successful.</returns>
@@ -92,17 +92,28 @@ public static class ScheduledWakeUp
                 taskService.Connect(null, null, null, null);
                 ITaskFolder rootFolder = GetRootFolder(taskService);
                 var timers = ConfigFactory.Root.Timers;
+                var enabledTimers = timers.List
+                    .Where(timer => timer.IsEnabled != false)
+                    .DistinctBy(timer => (timer.Hour, timer.Minute))
+                    .ToArray();
+
+                if (timers.ScheduledWakeUp && enabledTimers.Length > MaxWakeUpTriggers)
+                {
+                    error = $"Windows Task Scheduler supports at most {MaxWakeUpTriggers} distinct wake-up times per task.";
+                    _logger.Error("{ErrorMessage} Requested wake-up times: {TriggerCount}", error, enabledTimers.Length);
+                    return false;
+                }
 
                 // 一律覆盖式重建：先删本实例任务，再按当前状态决定是否注册
                 DeleteTask(rootFolder);
 
-                if (!timers.ScheduledWakeUp)
+                if (!timers.ScheduledWakeUp || enabledTimers.Length == 0)
                 {
-                    _logger.Information("Scheduled wake-up is off, task removed");
+                    _logger.Information("Scheduled wake-up is off or has no enabled timers, task removed");
                     return true;
                 }
 
-                RegisterTask(taskService, rootFolder, timers.List);
+                RegisterTask(taskService, rootFolder, enabledTimers);
                 return true;
             }
         }
@@ -171,7 +182,7 @@ public static class ScheduledWakeUp
         }
     }
 
-    private static void RegisterTask(ITaskService taskService, ITaskFolder rootFolder, ObservableCollection<Timer> timers)
+    private static void RegisterTask(ITaskService taskService, ITaskFolder rootFolder, IReadOnlyList<Timer> timers)
     {
         taskService.NewTask(0, out ITaskDefinition definition);
         WithBStr("Wakes up the computer and launches MAA before each enabled scheduled timer", description => definition.RegistrationInfo.Description = description);
@@ -182,18 +193,11 @@ public static class ScheduledWakeUp
             ? TASK_RUNLEVEL_TYPE.TASK_RUNLEVEL_HIGHEST
             : TASK_RUNLEVEL_TYPE.TASK_RUNLEVEL_LUA;
 
-        // 每个启用的定时项一个每日触发器，Id 对应槽位号以保留排查时的对应关系；
-        // null（右键清空的第三态）视为启用，与 TaskQueueViewModel.CheckTimers 的判定一致
+        // 相同时刻的启用项共用一个每日触发器，Id 使用配置中的定时项编号。
         int triggerCount = 0;
-        for (int slot = 0; slot < Math.Min(timers.Count, TimerSlotCount); slot++)
+        foreach (var timer in timers)
         {
-            var timer = timers[slot];
-            if (timer.IsEnabled == false)
-            {
-                continue;
-            }
-
-            CreateTrigger(definition.Triggers, slot + 1, timer.Hour, timer.Minute);
+            CreateTrigger(definition.Triggers, timer.Id + 1, timer.Hour, timer.Minute);
             triggerCount++;
         }
 

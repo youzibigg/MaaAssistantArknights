@@ -53,6 +53,7 @@ using Stylet.Xaml;
 using static MaaWpfGui.Configuration.Global.Gui;
 using static MaaWpfGui.Main.AsstProxy;
 using Application = System.Windows.Application;
+using ScheduledTimer = MaaWpfGui.Configuration.Global.Timer;
 using Screen = Stylet.Screen;
 using Task = System.Threading.Tasks.Task;
 
@@ -1056,15 +1057,15 @@ public class TaskQueueViewModel : Screen
         });
     }
 
-    private static (bool _timeToStart, bool _timeToChangeConfig, int _configIndex) CheckTimers(DateTime currentTime)
+    private static (bool _timeToStart, bool _timeToChangeConfig, int _configIndex) CheckTimers(DateTime currentTime, IReadOnlyList<ScheduledTimer> timers)
     {
         bool timeToStart = false;
         bool timeToChangeConfig = false;
         int configIndex = 0;
 
-        for (int i = 0; i < 8; ++i)
+        for (int i = 0; i < timers.Count; ++i)
         {
-            var timer = SettingsViewModel.TimerSettings.TimerList[i];
+            var timer = timers[i];
             if (timer.IsEnabled == false)
             {
                 continue;
@@ -1102,7 +1103,7 @@ public class TaskQueueViewModel : Screen
         return (timeToStart, timeToChangeConfig, configIndex);
     }
 
-    private static void HandleScheduledStartNotifications(DateTime currentTime)
+    private static void HandleScheduledStartNotifications(DateTime currentTime, IReadOnlyList<ScheduledTimer> timers)
     {
         var settings = SettingsViewModel.TimerSettings;
         var notifyDesktop = settings.NotifyBeforeScheduledStart;
@@ -1115,9 +1116,8 @@ public class TaskQueueViewModel : Screen
 
         // 比较提前后的时刻，兼容跨午夜的定时任务。
         var startTime = currentTime.AddMinutes(settings.ScheduledStartNotificationMinutes);
-        for (int i = 0; i < settings.TimerList.Count; ++i)
+        foreach (var timer in timers)
         {
-            var timer = settings.TimerList[i];
             if (timer.IsEnabled == false || timer.Hour != startTime.Hour || timer.Minute != startTime.Minute)
             {
                 continue;
@@ -1126,11 +1126,11 @@ public class TaskQueueViewModel : Screen
             var title = LocalizationHelper.GetString("ScheduledStartNotificationTitle");
             var content = string.Format(
                 LocalizationHelper.GetString("ScheduledStartNotificationContent"),
-                i + 1,
+                timer.Id + 1,
                 startTime.ToString("HH:mm"),
                 settings.ScheduledStartNotificationMinutes);
 
-            _logger.Information("Scheduled start notification: Timer Index: {TimerIndex}, Start Time: {StartTime}", i, startTime);
+            _logger.Information("Scheduled start notification: Timer Index: {TimerIndex}, Start Time: {StartTime}", timer.Id, startTime);
             if (notifyDesktop)
             {
                 using var toast = new ToastNotification(title);
@@ -1151,47 +1151,75 @@ public class TaskQueueViewModel : Screen
             return;
         }
 
-        await Execute.OnUIThreadAsync(() => HandleScheduledStartNotifications(currentTime));
+        ScheduledTimer[] timers = [];
+        await Execute.OnUIThreadAsync(() => {
+            timers = SettingsViewModel.TimerSettings.TimerList.ToArray();
+            HandleScheduledStartNotifications(currentTime, timers);
+        });
 
-        var (timeToStart, timeToChangeConfig, timerIndex) = CheckTimers(currentTime);
+        var (timeToStart, timeToChangeConfig, timerIndex) = CheckTimers(currentTime, timers);
+
+        if (!timeToStart && !timeToChangeConfig)
+        {
+            return;
+        }
+
+        var timer = timers[timerIndex];
 
         if (timeToChangeConfig)
         {
-            _logger.Information("Scheduled configuration change: Timer Index: {TimerIndex}", timerIndex);
-            HandleConfigChange(timerIndex);
+            await Execute.OnUIThreadAsync(() => {
+                if (IsTimerEnabled(timer))
+                {
+                    _logger.Information("Scheduled configuration change: Timer Index: {TimerIndex}", timer.Id);
+                    HandleConfigChange(timer);
+                }
+            });
             return;
         }
 
         if (timeToStart)
         {
-            _logger.Information("Scheduled start: Timer Index: {TimerIndex}", timerIndex);
-            await HandleScheduledStart(timerIndex);
+            _logger.Information("Scheduled start: Timer Index: {TimerIndex}", timer.Id);
+            await HandleScheduledStart(timer);
 
-            SettingsViewModel.TimerSettings.TimerList[timerIndex].IsEnabled ??= false;
+            await Execute.OnUIThreadAsync(() => { timer.IsEnabled ??= false; });
         }
     }
 
-    private void HandleConfigChange(int timerIndex)
+    private static bool IsTimerEnabled(ScheduledTimer timer)
+    {
+        bool enabled = false;
+        Execute.OnUIThread(() => enabled = SettingsViewModel.TimerSettings.TimerList.Contains(timer) && timer.IsEnabled != false);
+        return enabled;
+    }
+
+    private void HandleConfigChange(ScheduledTimer timer)
     {
         if (SettingsViewModel.TimerSettings.CustomConfig &&
             (_runningState.GetIdle() || SettingsViewModel.TimerSettings.ForceScheduledStart))
         {
-            Instances.SettingsViewModel.CurrentConfiguration = SettingsViewModel.TimerSettings.TimerList[timerIndex].Config;
+            Instances.SettingsViewModel.CurrentConfiguration = timer.Config;
         }
     }
 
-    private async Task HandleScheduledStart(int configIndex)
+    private async Task HandleScheduledStart(ScheduledTimer timer)
     {
+        if (!IsTimerEnabled(timer))
+        {
+            return;
+        }
+
         if (SettingsViewModel.TimerSettings.ForceScheduledStart)
         {
             if (SettingsViewModel.TimerSettings.CustomConfig &&
-                Instances.SettingsViewModel.CurrentConfiguration != SettingsViewModel.TimerSettings.TimerList[configIndex].Config)
+                Instances.SettingsViewModel.CurrentConfiguration != timer.Config)
             {
                 _logger.Warning(
                     "Scheduled start skipped: Custom configuration is enabled, but the current configuration does not match the scheduled timer configuration (Timer Index: {ConfigIndex}). Current Configuration: {CurrentConfiguration}, Scheduled Configuration: {TimerConfig}",
-                    configIndex,
+                    timer.Id,
                     Instances.SettingsViewModel.CurrentConfiguration,
-                    SettingsViewModel.TimerSettings.TimerList[configIndex].Config);
+                    timer.Config);
                 return;
             }
 
@@ -1208,11 +1236,21 @@ public class TaskQueueViewModel : Screen
                 return;
             }
 
+            if (!IsTimerEnabled(timer))
+            {
+                return;
+            }
+
             if (!_runningState.GetIdle())
             {
                 _logger.Information("Not idle, Stop and CloseDown");
                 await Stop();
                 SetStopped();
+            }
+
+            if (!IsTimerEnabled(timer))
+            {
+                return;
             }
 
             var mode = SettingsViewModel.GameSettings.ClientType;
@@ -1319,14 +1357,6 @@ public class TaskQueueViewModel : Screen
             ConfigFactory.CurrentConfig.TaskQueue.Add(new UserDataUpdateTask());
         }
 
-        // 临时补足到8个，支持添加删除后移除此代码
-        if (ConfigFactory.Root.Timers.List.Count < 8)
-        {
-            for (int i = ConfigFactory.Root.Timers.List.Count; i < 8; i++)
-            {
-                ConfigFactory.Root.Timers.List.Add(new(i, string.Empty));
-            }
-        }
         List<TaskItemViewModel> taskqueue = [];
         for (int i = 0; i < ConfigFactory.CurrentConfig.TaskQueue.Count; i++)
         {

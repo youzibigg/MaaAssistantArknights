@@ -13,7 +13,9 @@
 
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Documents;
@@ -32,6 +34,8 @@ namespace MaaWpfGui.ViewModels.UserControl.Settings;
 /// </summary>
 public class TimerSettingsUserControlModel : PropertyChangedBase
 {
+    private readonly HashSet<Timer> _subscribedTimers = [];
+
     static TimerSettingsUserControlModel()
     {
         Instance = new();
@@ -41,8 +45,7 @@ public class TimerSettingsUserControlModel : PropertyChangedBase
     {
         // 订阅现有定时器，并在列表增删时重新订阅，用于触发 ｢时间管理大师｣ 成就
         SubscribeTimerChanges();
-        TimerList.CollectionChanged += (_, _) =>
-        {
+        TimerList.CollectionChanged += (_, _) => {
             SubscribeTimerChanges();
             ScheduledWakeUpRegistrar.SyncAllDebounced();
         };
@@ -88,6 +91,29 @@ public class TimerSettingsUserControlModel : PropertyChangedBase
 
     public ObservableCollection<Timer> TimerList => ConfigFactory.Root.Timers.List;
 
+    public void AddTimer()
+    {
+        int id = TimerList.Count == 0 ? 0 : TimerList.Max(timer => timer.Id) + 1;
+        var startTime = DateTime.Now.AddHours(1);
+        TimerList.Add(new Timer(id, Instances.SettingsViewModel.CurrentConfiguration ?? string.Empty) {
+            Hour = startTime.Hour,
+            Minute = startTime.Minute,
+        });
+    }
+
+    public void RemoveTimer(Timer timer)
+    {
+        if (!TimerList.Remove(timer))
+        {
+            return;
+        }
+
+        for (int i = 0; i < TimerList.Count; i++)
+        {
+            TimerList[i].Id = i;
+        }
+    }
+
     public ExternalNotificationSettingsUserControlModel ExternalNotificationSettings => SettingsViewModel.ExternalNotificationSettings;
 
     public bool NotifyBeforeScheduledStart
@@ -117,8 +143,7 @@ public class TimerSettingsUserControlModel : PropertyChangedBase
             SetAndNotify(ref field, value);
 
             // COM 注册较慢，放后台线程执行，完成后按结果提示
-            Task.Run(() =>
-            {
+            Task.Run(() => {
                 if (ScheduledWakeUpRegistrar.SyncAll(out var error))
                 {
                     return;
@@ -135,10 +160,19 @@ public class TimerSettingsUserControlModel : PropertyChangedBase
     /// </summary>
     private void SubscribeTimerChanges()
     {
-        foreach (var timer in TimerList)
+        foreach (var timer in _subscribedTimers)
         {
             timer.PropertyChanged -= OnTimerPropertyChanged;
-            timer.PropertyChanged += OnTimerPropertyChanged;
+        }
+
+        _subscribedTimers.Clear();
+
+        foreach (var timer in TimerList)
+        {
+            if (_subscribedTimers.Add(timer))
+            {
+                timer.PropertyChanged += OnTimerPropertyChanged;
+            }
         }
     }
 

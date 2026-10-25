@@ -16,6 +16,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
 using System.Text.Json.Serialization;
+using MaaWpfGui.Constants;
 using MaaWpfGui.Models;
 using static MaaWpfGui.Configuration.Factory.ConfigFactory;
 
@@ -57,5 +58,10 @@ public partial class TimerSettings : NotifyPropertyChangedWithValue
     public bool ScheduledWakeUp { get; set; }
 
     [JsonInclude]
-    public ObservableCollection<Timer> List { get; private set; } = [];
+    public ObservableCollection<Timer> List { get; private set; } =
+    [
+        new(0, ConfigurationKeys.DefaultConfiguration),
+        new(1, ConfigurationKeys.DefaultConfiguration),
+        new(2, ConfigurationKeys.DefaultConfiguration),
+    ];
 }

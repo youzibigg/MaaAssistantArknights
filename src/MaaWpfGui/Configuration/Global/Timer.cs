@@ -43,7 +43,7 @@ public class Timer : PropertyChangedBase
     {
     }
 
-    public int Id { get; set; }
+    public int Id { get; set => SetAndNotify(ref field, value); }
 
     [JsonInclude]
     public bool? IsEnabled { get; set => SetAndNotify(ref field, value); } = false;
