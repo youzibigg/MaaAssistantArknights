@@ -196,8 +196,8 @@
                 Grid.Column="2"
                 Grid.ColumnSpan="2"
                 Width="320"
-                Height="{Binding ActualHeight, ElementName=TimerOptionsPanel}"
-                MinHeight="154"
+                MaxHeight="{c:Binding 'ActualHeight > 154 ? ActualHeight : 154',
+                                      ElementName=TimerOptionsPanel}"
                 HorizontalAlignment="Center"
                 VerticalAlignment="Top">
                 <Grid.RowDefinitions>
@@ -235,7 +235,7 @@
                 </Border>
                 <Button
                     Grid.Row="1"
-                    Margin="5,10,5,5"
+                    Margin="5,5,5,5"
                     HorizontalAlignment="Center"
                     Command="{s:Action AddTimer}"
                     Content="{DynamicResource AddTimer}" />
